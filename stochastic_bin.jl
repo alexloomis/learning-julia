@@ -1,48 +1,48 @@
-mutable struct Bin
-  minVal
-  maxVal
-  contents
+struct Bin{T}
+  minVal :: T
+  maxVal :: T
+  contents :: Vector{T}
 end
 
-placeElem(elem, bin) = Bin(min(elem, bin.minVal),
+placeelem(elem, bin) = Bin(min(elem, bin.minVal),
                            max(elem, bin.maxVal),
-                           vcat([elem], bin.contents))
+                           vcat(bin.contents, [elem]))
 
-function firstElemSt(p,ar)
-  for idx in eachindex(ar)
-    if p(ar[idx])
-      return idx
-    end
-  end
-  return 0
-end
-
-function binElem(elem, bins)
-  idx = firstElemSt(x -> x.maxVal >= elem, bins)
+function binelem(elem, bins)
+  idx = findfirst(x -> x.maxVal >= elem, bins)
   # If no bin has maxVal greater than elem, place in last bin
-  if idx == 0; idx = length(bins); end;
+  if idx === nothing; idx = length(bins); end;
   # Is there a choice between bins?
   if elem < bins[idx].minVal && idx !== 1 &&
     # If there is, choose the smaller bin
     length(bins[idx-1].contents) <= length(bins[idx].contents)
       idx -= 1
   end
-  bins[idx] = placeElem(elem, bins[idx])
+  bins[idx] = placeelem(elem, bins[idx])
   return bins
 end
 
-approxLambertW(x) = round(Int, log(x) - log(log(x)))
+approxExpLambertW(x) = round(Int, x/log(x))
 
-function stochasticBin(ar; bins = length(ar) |> approxLambertW)
+@views function stochasticbin(ar; bins = length(ar) |> approxExpLambertW)
   if bins >= length(ar)
     return map(x -> [x], sort(ar))
   end
   binned = map(x -> Bin(x,x,[x]), sort(ar[1:bins]))
   rest = ar[(bins + 1):end]
   while length(rest) > 0
-    binned = binElem(rest[1],binned)
+    binned = binelem(rest[1],binned)
     rest = rest[2:end]
   end
   return map(x -> x.contents, binned)
+end
+
+binsort(ar, b) = vcat(sort.(stochasticbin(ar,bins = b))...)
+binsort(ar) = vcat(sort.(stochasticbin(ar))...)
+
+function loss(ar)
+  lengths = length.(ar)
+  μ = sum(lengths)/length(ar)
+  return map(x -> (x - μ)^2, lengths) |> sum
 end
 
